@@ -31,6 +31,7 @@ export async function GET() {
         progress:       t.progress       ?? null,
         priority:       t.priority        ?? null,
         recurring:      t.recurring       ?? null,
+        recurringEndDate: t.recurringEndDate ?? null,
       })),
     );
   } catch (err) {
@@ -51,6 +52,7 @@ export async function POST(req: NextRequest) {
       estimatedUnit?: string | null;
       priority?: string | null;
       recurring?: string | null;
+      recurringEndDate?: string | null;
       subtasks?: { text: string; done: boolean; date?: string | null; assignee?: string | null; budget?: number | null; estimatedHours?: number | null }[];
     };
     if (!body.text?.trim()) {
@@ -68,6 +70,7 @@ export async function POST(req: NextRequest) {
       subtasks:       body.subtasks       ?? [],
       priority:       body.priority        ?? null,
       recurring:      body.recurring       ?? null,
+      recurringEndDate: body.recurringEndDate ?? null,
       createdAt:      new Date(),
     };
     const col    = await getCol();
@@ -94,7 +97,7 @@ export async function PATCH(req: NextRequest) {
       subtaskIndex?: number;
       deleteSubtaskIndex?: number;
       addSubtask?: { text: string; done: boolean; startDate?: string | null; assignee?: string | null; budget?: number | null; estimatedHours?: number | null };
-      updateTask?: { text: string; startDate: string | null; assignee: string | null; budget: number | null; budgetCurrency: string; estimatedHours: number | null; estimatedUnit: string; priority: string | null; recurring: string | null };
+      updateTask?: { text: string; startDate: string | null; assignee: string | null; budget: number | null; budgetCurrency: string; estimatedHours: number | null; estimatedUnit: string; priority: string | null; recurring: string | null; recurringEndDate: string | null };
       updateSubtask?: { text: string; done: boolean; startDate: string | null; assignee: string | null; budget: number | null; estimatedHours: number | null; progress: number | null };
     };
     if (!body.id) return NextResponse.json({ error: 'id is required' }, { status: 400 });
@@ -121,10 +124,10 @@ export async function PATCH(req: NextRequest) {
         { $set: { [`subtasks.${body.subtaskIndex}.done`]: !!body.done, ...(body.done ? { [`subtasks.${body.subtaskIndex}.progress`]: 100 } : {}) } },
       );
     } else if (body.updateTask) {
-      const { text, startDate, assignee, budget, budgetCurrency, estimatedHours, estimatedUnit, priority, recurring } = body.updateTask;
+      const { text, startDate, assignee, budget, budgetCurrency, estimatedHours, estimatedUnit, priority, recurring, recurringEndDate } = body.updateTask;
       await col.updateOne(
         { _id: new ObjectId(body.id) },
-        { $set: { text, startDate, assignee, budget, budgetCurrency, estimatedHours, estimatedUnit, priority, recurring } },
+        { $set: { text, startDate, assignee, budget, budgetCurrency, estimatedHours, estimatedUnit, priority, recurring, recurringEndDate } },
       );
     } else if (body.deleteSubtaskIndex !== undefined) {
       // $unset sets the element to null, then $pull removes all nulls
