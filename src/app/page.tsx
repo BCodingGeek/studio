@@ -1,6 +1,7 @@
 ﻿import type { Metadata } from 'next';
 import Header from '@/components/common/Header';
 import Footer from '@/components/common/Footer';
+import ExperienceSection from '@/components/sections/ExperienceSection';
 import AboutSection from '@/components/sections/AboutSection';
 import ProjectsSection from '@/components/sections/ProjectsSection';
 import BlogSection from '@/components/sections/BlogSection';
@@ -97,6 +98,7 @@ export default function HomePage() {
           </div>
         </section>
 
+        <ExperienceSection />
         <AboutSection />
         <ProjectsSection />
         <BlogSection />
