@@ -106,6 +106,7 @@ interface Todo {
   progress: number | null;
   priority: Priority | null;
   recurring: RecurringFrequency | null;
+  recurringEndDate: string | null;
 }
 
 export default function TodoPage() {
@@ -128,6 +129,7 @@ export default function TodoPage() {
   const [newEstUnit,         setNewEstUnit]         = useState<'hrs' | 'days'>('hrs');
   const [newPriority,        setNewPriority]        = useState<Priority | null>(null);
   const [newRecurring,       setNewRecurring]       = useState<RecurringFrequency | null>(null);
+  const [newRecurringEndDate, setNewRecurringEndDate] = useState('');
   const [newSubtasks,  setNewSubtasks]  = useState<Subtask[]>([]);
   const [stFormOpen,   setStFormOpen]   = useState(false);
   const [stDraft,      setStDraft]      = useState(emptyDraft);
@@ -155,6 +157,7 @@ export default function TodoPage() {
     estHours: '', estUnit: 'hrs' as 'hrs' | 'days',
     priority: null as Priority | null,
     recurring: null as RecurringFrequency | null,
+    recurringEndDate: '',
   });
 
   /* edit subtask state */
@@ -372,6 +375,7 @@ export default function TodoPage() {
     setNewEstUnit('hrs'); setNewSubtasks([]);
     setNewPriority(null);
     setNewRecurring(null);
+    setNewRecurringEndDate('');
     setStDraft(emptyDraft); setStFormOpen(false); setStError('');
   }
 
@@ -395,6 +399,7 @@ export default function TodoPage() {
         estimatedUnit:  newEstUnit,
         priority:       newPriority,
         recurring:      newRecurring,
+        recurringEndDate: newRecurring ? (newRecurringEndDate || null) : null,
         subtasks:       newSubtasks,
       }),
     });
@@ -416,27 +421,31 @@ export default function TodoPage() {
       });
       setTodos((p) => p.map((t) => t.id === todo.id ? { ...t, done: true, progress: 100 } : t));
 
-      // Auto-create next occurrence for recurring tasks
+      // Auto-create next occurrence for recurring tasks, unless it's past the recurrence end date
       if (todo.recurring) {
         const nextStart = nextRecurringDate(todo.startDate, todo.recurring);
-        const res = await fetch('/api/workload', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            text:           todo.text,
-            startDate:      nextStart,
-            assignee:       todo.assignee,
-            budget:         todo.budget,
-            budgetCurrency: todo.budgetCurrency,
-            estimatedHours: todo.estimatedHours,
-            estimatedUnit:  todo.estimatedUnit,
-            priority:       todo.priority,
-            recurring:      todo.recurring,
-            subtasks:       todo.subtasks.map((s) => ({ ...s, done: false, progress: null })),
-          }),
-        });
-        const next = await res.json() as Todo;
-        setTodos((p) => [...p, next]);
+        const isPastEnd = !!(todo.recurringEndDate && nextStart && nextStart > todo.recurringEndDate);
+        if (!isPastEnd) {
+          const res = await fetch('/api/workload', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              text:           todo.text,
+              startDate:      nextStart,
+              assignee:       todo.assignee,
+              budget:         todo.budget,
+              budgetCurrency: todo.budgetCurrency,
+              estimatedHours: todo.estimatedHours,
+              estimatedUnit:  todo.estimatedUnit,
+              priority:       todo.priority,
+              recurring:      todo.recurring,
+              recurringEndDate: todo.recurringEndDate,
+              subtasks:       todo.subtasks.map((s) => ({ ...s, done: false, progress: null })),
+            }),
+          });
+          const next = await res.json() as Todo;
+          setTodos((p) => [...p, next]);
+        }
       }
     } else {
       await fetch('/api/workload', {
@@ -550,6 +559,7 @@ export default function TodoPage() {
       estimatedUnit:  editTaskDraft.estUnit,
       priority:       editTaskDraft.priority,
       recurring:      editTaskDraft.recurring,
+      recurringEndDate: editTaskDraft.recurring ? (editTaskDraft.recurringEndDate || null) : null,
     };
     await fetch('/api/workload', {
       method: 'PATCH',
@@ -1077,6 +1087,26 @@ export default function TodoPage() {
                 </div>
               </div>
 
+              {/* Recurrence end — only relevant once a frequency is chosen */}
+              {newRecurring && (
+                <div className="rounded-lg border border-accent/20 bg-accent/[0.04] p-3">
+                  <label className={lbl}>Recurrence ends <span className="text-foreground/35 font-normal">(optional)</span></label>
+                  <input
+                    type="date"
+                    value={newRecurringEndDate}
+                    min={newDate || undefined}
+                    onChange={(e) => setNewRecurringEndDate(e.target.value)}
+                    style={{ colorScheme: 'light dark' }}
+                    className={field}
+                  />
+                  <p className="text-[10px] text-foreground/40 mt-1.5">
+                    {newRecurringEndDate
+                      ? `No new occurrences will be created after ${new Date(newRecurringEndDate + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}.`
+                      : 'Leave blank to repeat indefinitely.'}
+                  </p>
+                </div>
+              )}
+
               {/* Sub-tasks */}
               <div>
                 <div className="flex items-center justify-between mb-2">
@@ -1545,6 +1575,26 @@ export default function TodoPage() {
                           ))}
                         </div>
                       </div>
+
+                      {/* Recurrence end — only relevant once a frequency is chosen */}
+                      {editTaskDraft.recurring && (
+                        <div className="rounded-lg border border-accent/20 bg-accent/[0.04] p-3">
+                          <label className={lbl}>Recurrence ends <span className="text-foreground/35 font-normal">(optional)</span></label>
+                          <input
+                            type="date"
+                            value={editTaskDraft.recurringEndDate}
+                            min={editTaskDraft.startDate || undefined}
+                            onChange={(e) => setEditTaskDraft({ ...editTaskDraft, recurringEndDate: e.target.value })}
+                            style={{ colorScheme: 'light dark' }}
+                            className={field}
+                          />
+                          <p className="text-[10px] text-foreground/40 mt-1.5">
+                            {editTaskDraft.recurringEndDate
+                              ? `No new occurrences will be created after ${new Date(editTaskDraft.recurringEndDate + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}.`
+                              : 'Leave blank to repeat indefinitely.'}
+                          </p>
+                        </div>
+                      )}
                       <div className="flex gap-2 justify-end pt-1 border-t border-accent/10">
                         <Button type="button" variant="ghost" size="sm"
                           onClick={() => setEditingTaskId(null)}
@@ -1592,6 +1642,7 @@ export default function TodoPage() {
                               estUnit: todo.estimatedUnit as 'hrs' | 'days',
                               priority: todo.priority,
                               recurring: todo.recurring,
+                              recurringEndDate: todo.recurringEndDate || '',
                             });
                             setEditingTaskId(todo.id);
                           }}
@@ -1630,6 +1681,7 @@ export default function TodoPage() {
                         {todo.recurring && (
                           <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-medium bg-accent/10 border border-accent/20 text-accent">
                             ↻ {RECURRING_OPTIONS.find(o => o.value === todo.recurring)?.label ?? todo.recurring}
+                            {todo.recurringEndDate && ` until ${new Date(todo.recurringEndDate + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`}
                           </span>
                         )}
                         {todo.startDate && (
