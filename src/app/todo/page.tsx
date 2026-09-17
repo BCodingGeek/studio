@@ -168,7 +168,7 @@ export default function TodoPage() {
   const [progressDraft,      setProgressDraft]      = useState('');
 
   /* filter */
-  const [filter, setFilter] = useState<'all' | 'pending'>('all');
+  const [filter, setFilter] = useState<'all' | 'pending' | 'recurring'>('all');
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [selectedAssignees, setSelectedAssignees] = useState<Set<string>>(new Set());
   const [selectedPriorities, setSelectedPriorities] = useState<Set<Priority>>(new Set());
@@ -667,7 +667,11 @@ export default function TodoPage() {
   const priorityFilteredTodos = selectedPriorities.size > 0
     ? assigneeFilteredTodos.filter((t) => t.priority && selectedPriorities.has(t.priority))
     : assigneeFilteredTodos;
-  const filteredTodos = (filter === 'pending' ? priorityFilteredTodos.filter((t) => !t.done) : priorityFilteredTodos)
+  const filteredTodos = (
+    filter === 'pending' ? priorityFilteredTodos.filter((t) => !t.done)
+    : filter === 'recurring' ? priorityFilteredTodos.filter((t) => !!t.recurring)
+    : priorityFilteredTodos
+  )
     .slice()
     .sort((a, b) => {
       const pa = a.priority ? PRIORITY_ORDER[a.priority] : 999;
@@ -684,7 +688,7 @@ export default function TodoPage() {
   const remainingBudgetUSD  = filteredBudgetUSD - spentBudgetUSD;
   const remainingBudgetLKR  = filteredBudgetLKR - spentBudgetLKR;
   const hasAnyBudget        = todos.some((t) => t.budget != null);
-  const isFiltered          = selectedDate !== undefined || selectedAssignees.size > 0 || selectedPriorities.size > 0 || filter === 'pending';
+  const isFiltered          = selectedDate !== undefined || selectedAssignees.size > 0 || selectedPriorities.size > 0 || filter !== 'all';
   const remaining         = todos.filter((t) => !t.done).length;
 
   const allAssignees = useMemo(
@@ -1377,7 +1381,7 @@ export default function TodoPage() {
         {/* ── filter tabs ── */}
         {!dbLoading && todos.length > 0 && (
           <div className="flex gap-1 mb-4 p-1 glass-card rounded-full w-fit">
-            {(['all', 'pending'] as const).map((f) => (
+            {(['all', 'pending', 'recurring'] as const).map((f) => (
               <button
                 key={f}
                 type="button"
@@ -1388,7 +1392,11 @@ export default function TodoPage() {
                     : 'text-foreground/55 hover:text-accent'
                 }`}
               >
-                {f === 'all' ? `All (${priorityFilteredTodos.length})` : `Pending (${priorityFilteredTodos.filter((t) => !t.done).length})`}
+                {f === 'all'
+                  ? `All (${priorityFilteredTodos.length})`
+                  : f === 'pending'
+                    ? `Pending (${priorityFilteredTodos.filter((t) => !t.done).length})`
+                    : `Recurring (${priorityFilteredTodos.filter((t) => !!t.recurring).length})`}
               </button>
             ))}
           </div>
@@ -1407,8 +1415,10 @@ export default function TodoPage() {
           <div className="glass-card rounded-2xl p-10 text-center">
             <p className="text-foreground/50 text-sm">
               {selectedDate
-                ? `No ${filter === 'pending' ? 'pending ' : ''}tasks for ${selectedDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}.`
-                : 'No pending tasks. All done! 🎉'}
+                ? `No ${filter === 'pending' ? 'pending ' : filter === 'recurring' ? 'recurring ' : ''}tasks for ${selectedDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}.`
+                : filter === 'recurring'
+                  ? 'No recurring tasks yet.'
+                  : 'No pending tasks. All done! 🎉'}
             </p>
           </div>
         ) : (
